@@ -165,8 +165,8 @@ int main(int argc, char **argv)
 {
     ros::init(argc, argv, "rplidar_node_client");
     ros::NodeHandle n;
-    ros::Subscriber sub = n.subscribe<sensor_msgs::LaserScan>("/scan", 500, scanCallback);
-    pub_vel = n.advertise<std_msgs::Float32>("/velocity", 500);   
+    ros::Subscriber sub = n.subscribe<sensor_msgs::LaserScan>("/scan", 280, scanCallback);
+    pub_vel = n.advertise<std_msgs::Float32>("/velocity", 280);
 
     ros::spin();
     return 0;
