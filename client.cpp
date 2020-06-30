@@ -135,10 +135,8 @@ void scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
     float right_dist =  right_dist_min[mid_index]; 
 
     float Avg_vel = AVE_VELOCIY * ( left_dist + right_dist);
-    int flag = 0; // 4가지 케이스(0.straight 1.slowly 2.urgently 3.wall) 중 어떤 케이스인지 저장.
-    // ROS_INFO("left_dist + right_dist : %f, Avg_vel : %f", left_dist + right_dist, Avg_vel);
-
-    float streer_angle = 0; // 자동차가 틀어야 하는 각도 
+    int flag = 0;
+    float steer_angle = 0; // 자동차가 틀어야 하는 각도 
     float dis_rate = (left_dist < right_dist)? right_dist/left_dist : left_dist/right_dist ;     
     if (dis_rate < THRESHOLD_DIS_RATE1){
         streer_angle = theta - 90; 
