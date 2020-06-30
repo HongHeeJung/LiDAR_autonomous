@@ -133,8 +133,8 @@ void scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
         distance_detected[i] = scan->ranges[i];
     }
 
-    int min_angle_index = min_Total_distance(count); // 0부터 180까지의 인덱스 값 반환
-    float theta = angle_detected[min_angle_index + count/2]; // 180이상의 인덱스 양수 범위
+    int min_angle_index = min_Total_distance(count);
+    float theta = angle_detected[min_angle_index + count/2];
     float right_dist = distance_detected[min_angle_index];
     float left_dist = distance_detected[min_angle_index + count/2];
 
