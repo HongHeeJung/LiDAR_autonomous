@@ -8,20 +8,27 @@
 #include "ros/ros.h"
 #include "sensor_msgs/LaserScan.h"
 #include "rplidar_ros/Control.h"
+#include "std_msgs/Float32.h"
 #include "math.h"
 
 #define RAD2DEG(x) ((x)*180./M_PI)
-#define AVE_VELOCIY 1600
+#define AVE_VELOCIY 100
 #define THRESHOLD_DIS_RATE1 1.4
 #define THRESHOLD_DIS_RATE2 2.5
 #define GO_CENTER_ANG30 45
 #define GO_CENTER_ANG60 68
 #define THRESHOLD_SPACE_RATE 1.4
 #define DIVIED_ANGLE 3
+#define CENTER_STEER 1550
+#define CENTER_PLUS 120 
  
 
 rplidar_ros::Control pubToArdu;
+std_msgs::Float32 pub_velocity;
+std_msgs::Float32 pub_steer;
 ros::Publisher pub;
+ros::Publisher pub_vel;
+ros::Publisher pub_steer_angle;
 
 // 알고리즘 구현에 필요한 전역변수
 float angle_detected[400] = {0.0,}; 
@@ -57,16 +64,22 @@ int middle_angle_index() {
 }
 
 float angle_for_Ardu(float streer_angle){
-    float angle_for_Ardu = streer_angle/DIVIED_ANGLE + 90;
-    if(angle_for_Ardu < 75) angle_for_Ardu = 70.0; // 오른쪽으로 가야함 
-    else if(75 <= angle_for_Ardu && angle_for_Ardu < 85)  angle_for_Ardu = 80.0;
-    else if(85 <= angle_for_Ardu && angle_for_Ardu < 95)  angle_for_Ardu = 90.0;  // 직선 주행
-    else if(95 <= angle_for_Ardu && angle_for_Ardu < 105)  angle_for_Ardu = 100.0; //
-    else if(105 <= angle_for_Ardu)  angle_for_Ardu = 110.0;  // 왼쪽으로 가야함
+    float angle_for_Ardu = streer_angle/DIVIED_ANGLE;
+    if(angle_for_Ardu < -15) angle_for_Ardu = CENTER_STEER - 2*CENTER_PLUS; // 오른쪽으로 가야함 
+    else if(-15 <= angle_for_Ardu && angle_for_Ardu < -5)  angle_for_Ardu = CENTER_STEER - CENTER_PLUS;
+    else if(-5 <= angle_for_Ardu && angle_for_Ardu < 5)  angle_for_Ardu = CENTER_STEER;  // 직선 주행
+    else if(5 <= angle_for_Ardu && angle_for_Ardu < 15)  angle_for_Ardu = CENTER_STEER + CENTER_PLUS; //
+    else if(15 <= angle_for_Ardu)  angle_for_Ardu = CENTER_STEER + 2*CENTER_PLUS;  // 왼쪽으로 가야함
     return angle_for_Ardu;
 }
 
-float velocity_for_Ardu(float Avg_vel){
+float velocity_for_Ardu(float Avg_vel, int flag){
+    // 이 방법이 성공하면 Avg_vel * 0.6 or 0.3 or 0.2 등의 연산은 필요없다.
+    if(flag == 0) Avg_vel = 1600;
+    else if(flag == 1) Avg_vel = 1547;
+    else if(flag == 2) Avg_vel = 1527;
+    else if(flag == 3) Avg_vel = 1517;
+    
     return Avg_vel;
 }
 
@@ -120,29 +133,19 @@ void scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
     float theta = angle_min[mid_index] ; // theta - 90 : 직선 주행을 하기 위해 자동차가 틀어야하는 각도. theta : 라이저 정면 vs 직선 라인의 수선 사이의 각도. 0~180 도
     float left_dist = left_dist_min[mid_index]; //  
     float right_dist =  right_dist_min[mid_index]; 
-    ROS_INFO("theta : %f , left distance : %f , right distance : %f]:", theta,left_dist,right_dist );
 
     float Avg_vel = AVE_VELOCIY * ( left_dist + right_dist);
+    int flag = 0; // 4가지 케이스(0.straight 1.slowly 2.urgently 3.wall) 중 어떤 케이스인지 저장.
     // ROS_INFO("left_dist + right_dist : %f, Avg_vel : %f", left_dist + right_dist, Avg_vel);
 
-    float streer_angle = 0; // 자동차가 틀어야 하는 각도
-    // ROS_INFO("Avg_vel= %f  ,streer_angle : %f ", Avg_vel, streer_angle);
-    // 3. 임계 각도에 따라서, {직진 하다록}} VS {중앙을 가도록} 을 선택한다. 
+    float streer_angle = 0; // 자동차가 틀어야 하는 각도 
     float dis_rate = (left_dist < right_dist)? right_dist/left_dist : left_dist/right_dist ;     
-    if (dis_rate < THRESHOLD_DIS_RATE1){  // 직진 하도록
+    if (dis_rate < THRESHOLD_DIS_RATE1){
         streer_angle = theta - 90; 
-
-        /*
-        이 주석을 풀면, 코너를 만나면 속도를 절반으로 줄인다.
-        float rotate_rate = Find_state_rate();
-        if(rotate_rate >  THRESHOLD_SPACE_RATE){
-            Avg_vel = Avg_vel/2; 
-            ROS_INFO("go straight But soon coner");
-        } 
-        */
-        ROS_INFO("go straight");
+	flag = 1;
+        ROS_INFO("========================== CASE 1 ==========================");
     }
-    else if(dis_rate>= THRESHOLD_DIS_RATE1 && dis_rate < THRESHOLD_DIS_RATE2){   // 중앙으로 가도록. 심각성 중
+    else if(dis_rate>= THRESHOLD_DIS_RATE1 && dis_rate < THRESHOLD_DIS_RATE2){
         if (left_dist < right_dist){
             streer_angle = theta - (180 - GO_CENTER_ANG60);
         }
@@ -150,9 +153,10 @@ void scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
             streer_angle = theta - GO_CENTER_ANG60;
         }
         Avg_vel = Avg_vel * 0.6;
-        ROS_INFO("go to center slowly");
+        flag = 2;
+        ROS_INFO("========================== CASE 2 ==========================");
     }
-    else // 중앙으로 가도록. 심각성 상
+    else
     {
         if (left_dist < right_dist){
             streer_angle = theta - (180 - GO_CENTER_ANG30);
@@ -161,24 +165,24 @@ void scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
             streer_angle = theta - GO_CENTER_ANG30;
         }
         Avg_vel = Avg_vel * 0.3;
-        ROS_INFO("go to center urgently");
+        flag = 3;
+        ROS_INFO("========================== CASE 2 ==========================");
     }
     
 
-    if(left_dist < 0.20 || right_dist < 0.2) {
+    if(left_dist < 0.16 || right_dist < 0.16) {
         Avg_vel = Avg_vel * 0.2;  // 벽에 너무 가까이 있으면 속도를 매우 낮춘다.
-        ROS_INFO("Too close to the wall");
+        flag = 4;
+        ROS_INFO("========================== CASE 2 ==========================");
     }
-    // 알고리즘 구현 END **************************************************************************************************************
-    // 위의 구현 부분에 다음의 변수에 값을 대입해야 한다.
-    ROS_INFO("Before precess __for_Ardu fuc, Velocity= %lf  , streer_angle : %lf ", Avg_vel , streer_angle);
-    pubToArdu.velocity_on = true;           // 이 변수의 type = Bool
-    pubToArdu.streer_on = false;            // 이 변수의 type = Bool
-    pubToArdu.velocity = velocity_for_Ardu(Avg_vel);                     
-    pubToArdu.streer_angle = angle_for_Ardu(streer_angle);             
-    // ROS_INFO("Final Avg_vel= %f  ,Final streer_angle : %f ", pubToArdu.velocity, pubToArdu.streer_angle);
 
-    pub.publish(pubToArdu);
+    pub_velocity.data = velocity_for_Ardu(Avg_vel,flag);                     
+    pub_steer.data = angle_for_Ardu(streer_angle);
+    ROS_INFO("theta : %f , left distance : %f , right distance : %f]:", theta,left_dist,right_dist );        
+    ROS_INFO("Final Velocity= %f  ,streer_angle : %f ", pub_velocity.data, pub_steer.data);
+
+    pub_vel.publish(pub_velocity);
+    pub_steer_angle.publish(pub_steer);
 }
 
 int main(int argc, char **argv)
@@ -186,8 +190,9 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "rplidar_node_client");
     ros::NodeHandle n;
 
-    ros::Subscriber sub = n.subscribe<sensor_msgs::LaserScan>("/scan", 1000, scanCallback);
-    pub = n.advertise<rplidar_ros::Control>("/ToArdu", 1000);	
+    ros::Subscriber sub = n.subscribe<sensor_msgs::LaserScan>("/scan", 100, scanCallback);
+    pub_vel = n.advertise<std_msgs::Float32>("/velocity", 100);	
+    pub_steer_angle = n.advertise<std_msgs::Float32>("/streer_angle", 100);	
 
     ros::spin();
 
