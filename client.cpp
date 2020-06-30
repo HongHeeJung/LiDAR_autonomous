@@ -133,10 +133,10 @@ void scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
     float theta = angle_min[mid_index] ; // theta - 90 : 직선 주행을 하기 위해 자동차가 틀어야하는 각도. theta : 라이저 정면 vs 직선 라인의 수선 사이의 각도. 0~180 도
     float left_dist = left_dist_min[mid_index]; //  
     float right_dist =  right_dist_min[mid_index]; 
-    int flag = 0;
-	
+    
     float Avg_vel = AVE_VELOCIY * ( left_dist + right_dist);
-    float steer_angle = 0; // 자동차가 틀어야 하는 각도 
+    int flag = 0;
+    float streer_angle = 0; // 자동차가 틀어야 하는 각도 
     float dis_rate = (left_dist < right_dist)? right_dist/left_dist : left_dist/right_dist ;     
     if (dis_rate < THRESHOLD_DIS_RATE1){
         streer_angle = theta - 90; 
