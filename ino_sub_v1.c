@@ -1,6 +1,6 @@
 #include <Servo.h>
-//#include <ros.h>
-//#inlcude <std_msgs/Float32.h>
+#include <ros.h>
+#include <std_msgs/Float32.h>
 
 ros::NodeHandle nh;
 
@@ -8,24 +8,36 @@ Servo servo;
 Servo ESC;
 
 int vel = 1515; //min
-int ang = 1550; //중앙
+int ang = 1550; //center
+
+void servo_cb(const std_msgs::Float32& cmd_msg){
+  servo.writeMicroseconds(cmd_msg.data);
+}
+
+void ESC_cb(const std_msgs::Float32& cmd_msg){
+  servo.writeMicroseconds(cmd_msg.data);
+}
+
+ros::Subscriber<std_msgs::Float32> sub_vel("/velocity",ESC_cb);
+ros::Subscriber<std_msgs::Float32> sub_angle("/streer_angle",servo_cb);
 
 void setup() {
   nh.initNode();
-  nh.subscribe(pubToArdu);
+  nh.subscribe(sub_vel);
+  nh.subscribe(sub_angle);
 
   ESC.attach(9); //ESC pin
   servo.attach(10);
   
-  ESC.writeMicroseconds(vel); //1515~1700+a
-  servo.writeMicroseconds(ang);
+  //ESC.writeMicroseconds(vel); //1515~1700+a
+  //servo.writeMicroseconds(ang);
 
 }
 
 void loop() {
   nh.spinOnce();
   delay(1);
-  servo.writeMicroseconds(ang);
+  //servo.writeMicroseconds(ang);
   /*
   int speed; //Implements speed variable
   for(speed = 0; speed <= 70; speed += 5) { //Cycles speed up to 70% power for 1 second
