@@ -18,7 +18,6 @@
 
 #define THRESHOLD_SPACE_RATE 1.4
  
-
 rplidar_ros::Control pubToArdu;
 std_msgs::Float32 pub_velocity;
 // std_msgs::Float32 pub_steer;
@@ -28,11 +27,9 @@ ros::Publisher pub_vel;
 float angle_detected[400] = {0.0,};
 float distance_detected[400] = {0.0,};
 
-
 int min_Total_distance(int count){
     float temp = 30;
     int min_angle_index = 0;
-    
     for(int i = 0; i < count/2 ; i++){
         if(temp > distance_detected[i] + distance_detected[i+count/2] ){
             temp = distance_detected[i] + distance_detected[i+count/2];
@@ -42,12 +39,12 @@ int min_Total_distance(int count){
     return min_angle_index;
 }
 
-
 void Find_space_diff(int *where_big,float *space_diff){
+    // 곡선 주행 여부를 판별한다.
     float right_space = 0.0;
     float left_space = 0.0;
 
-    for(int i = 110; i < 161; i += 1){  
+    for(int i = 110; i < 161; i += 1){ 
         if( (distance_detected[i] < 2.5) && (distance_detected[360-i] < 2.5)){
             right_space += distance_detected[i];
             left_space += distance_detected[360-i];
@@ -76,8 +73,8 @@ float get_vel_steering(float streer_angle, int flag){
         Find_space_diff(&where_big, &space_diff);
 
         if(flag == 1 && space_diff < 1){
-            angle_plus = 2* space_diff;                                                  
-        } 
+            angle_plus = 2* space_diff;                                                 
+        }
         else if(flag == 1 && 1 <= space_diff && space_diff < 3 ){
             angle_plus = 2*space_diff;
         }
@@ -118,12 +115,12 @@ float get_vel_steering(float streer_angle, int flag){
                     }
                     Avg_vel = 1540 + i * 2;
                     break;
-                } 
+                }
             }
         }
         else{
             Avg_vel = 1525;
-        }      
+        }     
     }
     else{
         if(flag == 2) Avg_vel = 1525;
@@ -140,7 +137,7 @@ void scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
     int count = scan->scan_time / scan->time_increment;
     for(int i = 0; i < count; i++) {
         float degree = RAD2DEG(scan->angle_min + scan->angle_increment * i);
-        angle_detected[i] = degree; 
+        angle_detected[i] = degree;
         distance_detected[i] = scan->ranges[i];
     }
 
@@ -150,13 +147,13 @@ void scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
     float left_dist = distance_detected[min_angle_index + count/2];
 
     int flag = 1;
-    float streer_angle = 0; // 자동차가 틀어야 하는 각도
+    float streer_angle = 0;
 
-    float dis_diff = (left_dist < right_dist)? right_dist - left_dist : left_dist - right_dist ;    
+    float dis_diff = (left_dist < right_dist)? right_dist - left_dist : left_dist - right_dist ;   
     if (dis_diff < THRESHOLD_DIS_DIFF1){
         streer_angle = theta - 90;
         flag = 1;
-        ROS_INFO("=============== CASE 1 ===============");
+        ROS_INFO("CASE 11111111");
     }
     else if(dis_diff>= THRESHOLD_DIS_DIFF1 && dis_diff < THRESHOLD_DIS_DIFF2){
         if (left_dist < right_dist){
@@ -200,8 +197,8 @@ int main(int argc, char **argv)
     ros::NodeHandle n;
 
     ros::Subscriber sub = n.subscribe<sensor_msgs::LaserScan>("/scan", 500, scanCallback);
-    pub_vel = n.advertise<std_msgs::Float32>("/velocity", 500);   
+    pub_vel = n.advertise<std_msgs::Float32>("/velocity", 500);
     ros::spin();
 
     return 0;
-}
+} 
